@@ -17,6 +17,7 @@ public static class DesignSystemCommands
     {
         "info", "write-doc", "audit", "prepare", "propose-for", "show-proposals",
         "figma-compare", "figma-confirm", "figma-mark", "figma-unmark", "figma-accept",
+        "starter-presets", "starter-create",
     };
 
     public static string Run(string command, string argsJson = "{}")
@@ -37,6 +38,8 @@ public static class DesignSystemCommands
                 "figma-mark" => Mark(args),
                 "figma-unmark" => new { removed = FigmaSync.Unmark(Required(args, "style"), Required(args, "field")) },
                 "figma-accept" => Accept(),
+                "starter-presets" => DesignSystemStarterKit.Presets().Select(p => new { p.name, p.description, p.Source, problems = DesignSystemStarterKit.Problems(p) }),
+                "starter-create" => StarterCreate(args),
                 _ => throw new ArgumentException($"Unknown command '{command}'. Commands: {string.Join(", ", Names)}."),
             };
             return JsonConvert.SerializeObject(result, Formatting.Indented);
@@ -144,5 +147,24 @@ public static class DesignSystemCommands
     {
         FigmaSync.AcceptBaseline();
         return Compare(FigmaSync.Run());
+    }
+
+    // ---- Starter kit ----
+
+    private static object StarterCreate(JObject args)
+    {
+        if (DesignSystemStarterKit.WhyNotStart() is string blocked) throw new InvalidOperationException(blocked);
+        string name = (string)args["preset"] ?? "Neutral";
+        StarterPreset preset = DesignSystemStarterKit.Presets().FirstOrDefault(p => p.name == name || p.Source == name)
+                               ?? throw new ArgumentException($"No preset '{name}'. Run starter-presets for the list.");
+        var options = new DesignSystemStarterKit.Options
+        {
+            folder = (string)args["folder"] ?? DesignSystemNames.DefaultAssetFolder,
+            font = DesignSystemStarterKit.DefaultFont(),
+            documentTitle = (string)args["title"],
+        };
+        if ((string)args["brand"] is string hex)
+            options.brand = UnityEngine.ColorUtility.TryParseHtmlString(hex, out UnityEngine.Color c) ? c : throw new ArgumentException($"'{hex}' isn't a #RRGGBB colour.");
+        return new { preset = preset.name, created = DesignSystemStarterKit.Create(preset, options) };
     }
 }

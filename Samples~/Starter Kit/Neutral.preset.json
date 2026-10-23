@@ -1,0 +1,53 @@
+{
+  "kind": "design-system-preset",
+  "name": "Neutral",
+  "description": "Calm blue on light greys, 12 px corners, one font. A plain baseline to make your own.",
+  "colors": {
+    "Brand/Primary": "#3563E9",
+    "Brand/Accent": "#F2A93B",
+    "Neutral/Background": "#F6F7F9",
+    "Neutral/Surface": "#FFFFFF",
+    "Neutral/Subtle": "#E9ECF2",
+    "Neutral/Border": "#CDD3DE",
+    "Neutral/Transparent": "#FFFFFF00",
+    "Text/Default": "#1B2230",
+    "Text/Secondary": "#5B6475",
+    "Text/OnBrand": "#FFFFFF",
+    "Feedback/Right": "#2E9E5B",
+    "Feedback/Wrong": "#D64545"
+  },
+  "sizes": [
+    { "name": "Regular", "height": 48 },
+    { "name": "Small", "height": 36, "labelRole": "BodySmall" },
+    { "name": "XSmall", "height": 28, "labelRole": "BodyXSmall" }
+  ],
+  "buttonLabelRole": "Button",
+  "cornerRadius": 12,
+  "typography": {
+    "Display": { "size": 40, "style": "Bold" },
+    "H1": { "size": 32, "style": "Bold" },
+    "H2": { "size": 24, "style": "Bold" },
+    "ContentH3": { "size": 20, "style": "Bold" },
+    "BodyLarge": { "size": 18 },
+    "Body": { "size": 16 },
+    "BodySmall": { "size": 14 },
+    "BodyXSmall": { "size": 12 },
+    "Caption": { "size": 11 },
+    "Button": { "size": 16, "style": "Bold" },
+    "MCQTitle1": { "size": 18, "style": "Bold" },
+    "MCQTitle2": { "size": 18 },
+    "MCQBody1": { "size": 14 },
+    "MCQBody2": { "size": 12 },
+    "DragDropCardBody": { "size": 14 }
+  },
+  "buttons": [
+    { "name": "Button_Primary", "fill": "Brand/Primary", "label": "Text/OnBrand" },
+    { "name": "Button_Secondary", "fill": "Neutral/Subtle", "label": "Brand/Primary" },
+    { "name": "Button_Ghost", "fill": "Neutral/Transparent", "label": "Brand/Primary" },
+    { "name": "Button_Primary_Small", "variantOf": "Button_Primary", "size": "Small" }
+  ],
+  "surfaces": [
+    { "name": "Surface_Card", "fill": "Neutral/Surface", "padding": 16 }
+  ],
+  "answers": { "right": "Feedback/Right", "wrong": "Feedback/Wrong" }
+}

@@ -153,33 +153,46 @@ TypographyScale (text roles)        → StyledText    on a TMP text
 - **Disabled labels:** add `ButtonDisabledTint` with only the label in its targets.
 - **Headless setup:** `Unity.exe -batchmode -projectPath . -executeMethod DesignSystemAutomation.AutoSetupBatch`.
 - **Big projects:** adopt one area at a time with **Advanced ▸ Settings ▸ Included Paths**.
-- **The Advanced menu** holds the optional extras: settings, a starter template for brand-new projects, saving styles into prefab files, and refreshing recolour materials.
+- **The Advanced menu** holds the optional extras: settings, a preview prefab of every style, saving styles into prefab files, and refreshing recolour materials.
 
 ## Reusing in another project
 
 This folder is a Unity package, `com.nus.design-system`. Add it to another project in **Package Manager ▸ + ▸ Add package from git URL…** with the repository's git URL plus the package folder and a release tag:
 
 ```
-<repository git URL>?path=/ADGBL/Packages/com.nus.design-system#design-system-v0.1.0
+<repository git URL>?path=/ADGBL/Packages/com.nus.design-system#design-system-v0.2.0
 ```
 
-Or copy the folder into the project's `Packages/` folder to edit it there. It is two asmdefs, `DesignSystem` and `DesignSystem.Editor`, that depend only on uGUI (with TextMeshPro) and, in the editor, Newtonsoft JSON; Package Manager installs both. Then open **Tools ▸ Design System ▸ Open Design System**. It works the same on an existing project or a new one. The package's code is read-only in a project that installs it by git URL; the project's design system lives in its own assets.
+Or copy the folder into the project's `Packages/` folder to edit it there. It is two asmdefs, `DesignSystem` and `DesignSystem.Editor`, that depend only on uGUI (with TextMeshPro) and, in the editor, Newtonsoft JSON; Package Manager installs both. The package's code is read-only in a project that installs it by git URL; the project's design system lives in its own assets.
 
 Requirements: Unity 6 (built on 6000.3).
+
+Then pick the start that fits:
+
+- **A new project, or one with little UI:** **Tools ▸ Design System ▸ Set Up New Project…**. Pick a preset
+  (*Neutral* or *Bold*), a brand colour, a font and a folder, and it creates the project's own theme (colours and
+  Regular / Small / XSmall sizes), type scale, button styles (Primary, Secondary, Ghost, Primary Small) and a card panel
+  style, plus settings and a preview prefab. New buttons get the Primary style from then on.
+- **A project with UI already:** open **Tools ▸ Design System ▸ Open Design System** and **Scan**. It creates styles
+  from how the existing buttons, toggles and panels look, and styles them with no visible change.
+
+**Your own preset:** import the **Starter Kit** sample (Package Manager ▸ Design System ▸ Samples), copy a
+`.preset.json` anywhere under `Assets/` and change it. The wizard lists it beside the package's presets. The sample's
+README describes every key.
 
 Making it yours:
 1. **Design System Settings** (Advanced ▸ Settings) holds the project's choices: excluded folders, the generated
    document's title and folder, and the base class that makes a component a drag card (empty turns drag cards off).
    The tools create the theme, type scale and styles in the folder that holds the settings asset (`Assets/DesignSystem`
    until there is one).
-3. **Features that stay off until used:** right/wrong answer colours (the theme's *Use for every graded answer*
+2. **Features that stay off until used:** right/wrong answer colours (the theme's *Use for every graded answer*
    switch), drag cards (no matching base class, no drag cards), Figma sync (no `figma/sync-config.json`, no sync).
-4. **Text roles are data.** The type scale asset lists its roles; **Add a role** at the bottom of its Inspector creates one
+3. **Text roles are data.** The type scale asset lists its roles; **Add a role** at the bottom of its Inspector creates one
    of the project's own (starting from an existing role's look), and texts, styles, the theme and named sizes pick it
    from the same dropdown as the built-in ones. The built-in roles (the `TextRole` list in code) are always present, so
    code that names them, such as `TextRole.Button`, keeps working.
 
 Driving it from scripts and AI agents: `DesignSystemCommands.Run(command, json)` takes a command name (`info`,
 `write-doc`, `audit`, `prepare`, `propose-for`, `show-proposals`, `figma-compare`, `figma-confirm`, `figma-mark`,
-`figma-unmark`, `figma-accept`) and JSON arguments, and returns JSON. Code that can't reference the package assemblies,
+`figma-unmark`, `figma-accept`, `starter-presets`, `starter-create`) and JSON arguments, and returns JSON. Code that can't reference the package assemblies,
 such as Unity's AI command runner, calls it by name: `Type.GetType("DesignSystemCommands, DesignSystem.Editor")`.

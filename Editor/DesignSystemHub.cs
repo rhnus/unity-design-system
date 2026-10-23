@@ -114,7 +114,7 @@ public class DesignSystemHub : EditorWindow
         menu.AddSeparator("");
         menu.AddItem(new GUIContent("Settings"), false, () => Selection.activeObject = DesignSystemSettings.GetOrCreate());
         menu.AddItem(new GUIContent("Save styles into all prefabs"), false, DesignSystemAssets.ReapplyProject);
-        menu.AddItem(new GUIContent("Start from a template (new project)"), false, () => { DesignSystemStarterKit.Create(); Refresh(); });
+        menu.AddItem(new GUIContent("Set up a new project from a preset…"), false, DesignSystemSetupWizard.Open);
         menu.AddSeparator("");
         menu.AddItem(new GUIContent("Help"), false, OpenHelp);
         menu.ShowAsContext();
@@ -200,6 +200,14 @@ public class DesignSystemHub : EditorWindow
                     int toReview = lastScan?.Groups.Where(g => g.Confidence != MatchConfidence.Safe && !g.IsPicture).Sum(g => g.Count) ?? 0;
                     if (toReview > 0 && GUILayout.Button($"Review {toReview}", EditorStyles.miniButton, GUILayout.Width(80)))
                         ButtonAuditWindow.OpenWith(lastScan);
+                }
+            if (theme == null)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUILayout.Space(22);
+                    EditorGUILayout.LabelField(new GUIContent("New project with no UI yet? Start from a preset instead.",
+                        "Creates a theme, type scale and core button styles from a preset, then styles new buttons with them."), EditorStyles.miniLabel);
+                    if (GUILayout.Button("Set up…", EditorStyles.miniButton, GUILayout.Width(70))) DesignSystemSetupWizard.Open();
                 }
 
             using (new EditorGUI.DisabledScope(!IsSetUp))

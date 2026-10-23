@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0 — 2026-10-23
+
+- **Starter kit for new projects.** **Tools ▸ Design System ▸ Set Up New Project…** builds a project's own theme, type
+  scale, rounded shape sprite, button styles (Primary, Secondary, Ghost and a Small variant of Primary), a card panel
+  style, settings and a preview prefab from a preset, in the folder you pick. It never overwrites an asset and only
+  runs in a project with no theme yet.
+- **Presets as data**, shipped in the **Starter Kit** sample: *Neutral* and *Bold*. A project's own `.preset.json`
+  under `Assets/` is listed beside them.
+- The old **Advanced ▸ Create Starter Kit** (orange, with this game's sprites) is replaced by the wizard.
+- Agent commands `starter-presets` and `starter-create`.
+- `DesignSystemSettings.GetOrCreate(folder)` and `ForgetCached()`.
+
 ## 0.1.0 — 2026-10-23
 
 First release as a package, moved out of ADGBL's `Assets/Scripts/UI/DesignSystem`.

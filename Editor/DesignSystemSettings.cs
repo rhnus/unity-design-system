@@ -18,8 +18,6 @@ public class DesignSystemSettings : ScriptableObject
         [InspectorName("Every scene in the project")] AllScenes,
     }
 
-    private const string AssetPath = DesignSystemNames.DefaultAssetFolder + "/DesignSystemSettings.asset";
-
     [Header("Scan scope")]
     [Tooltip("Scenes are opened, scanned and closed in the background. Build Scenes covers what ships.")]
     public SceneScope sceneScope = SceneScope.BuildScenes;
@@ -89,17 +87,26 @@ public class DesignSystemSettings : ScriptableObject
 
     private void OnValidate() => cachedDragCardBase = null;
 
-    public static DesignSystemSettings GetOrCreate()
+    /// <summary>The settings asset, created in the folder (the default asset folder when null) if there is none.</summary>
+    public static DesignSystemSettings GetOrCreate(string folder = null)
     {
         DesignSystemSettings settings = Find();
         if (settings != null) return settings;
 
-        Directory.CreateDirectory(DesignSystemNames.DefaultAssetFolder);
+        folder = string.IsNullOrEmpty(folder) ? DesignSystemNames.DefaultAssetFolder : folder.TrimEnd('/');
+        Directory.CreateDirectory(folder);
         settings = CreateInstance<DesignSystemSettings>();
-        AssetDatabase.CreateAsset(settings, AssetPath);
+        AssetDatabase.CreateAsset(settings, folder + "/DesignSystemSettings.asset");
         AssetDatabase.SaveAssets();
-        DesignSystemAssets.ForgetFolder();
+        ForgetCached();
         return settings;
+    }
+
+    /// <summary>Re-reads the cached settings values and asset folder, after settings are created, moved or deleted.</summary>
+    public static void ForgetCached()
+    {
+        cachedDragCardBase = null;
+        DesignSystemAssets.ForgetFolder();
     }
 
     /// <summary>Whether a prefab or scene path is out of scope: outside every included folder, or excluded.</summary>

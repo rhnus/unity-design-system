@@ -1,0 +1,53 @@
+{
+  "kind": "design-system-preset",
+  "name": "Bold",
+  "description": "Deep violet with a warm accent, pill-shaped buttons, larger type. For playful, high-contrast games.",
+  "colors": {
+    "Brand/Primary": "#6D28D9",
+    "Brand/Accent": "#F59E0B",
+    "Neutral/Background": "#F5F3FF",
+    "Neutral/Surface": "#FFFFFF",
+    "Neutral/Subtle": "#EDE9FE",
+    "Neutral/Border": "#C4B5FD",
+    "Neutral/Transparent": "#FFFFFF00",
+    "Text/Default": "#1E1B2E",
+    "Text/Secondary": "#5B5670",
+    "Text/OnBrand": "#FFFFFF",
+    "Feedback/Right": "#16A34A",
+    "Feedback/Wrong": "#DC2626"
+  },
+  "sizes": [
+    { "name": "Regular", "height": 56 },
+    { "name": "Small", "height": 40, "labelRole": "BodySmall" },
+    { "name": "XSmall", "height": 32, "labelRole": "BodyXSmall" }
+  ],
+  "buttonLabelRole": "Button",
+  "cornerRadius": 28,
+  "typography": {
+    "Display": { "size": 48, "style": "Bold" },
+    "H1": { "size": 36, "style": "Bold" },
+    "H2": { "size": 28, "style": "Bold" },
+    "ContentH3": { "size": 22, "style": "Bold" },
+    "BodyLarge": { "size": 20 },
+    "Body": { "size": 18 },
+    "BodySmall": { "size": 16 },
+    "BodyXSmall": { "size": 14 },
+    "Caption": { "size": 12 },
+    "Button": { "size": 20, "style": "Bold" },
+    "MCQTitle1": { "size": 20, "style": "Bold" },
+    "MCQTitle2": { "size": 20 },
+    "MCQBody1": { "size": 16 },
+    "MCQBody2": { "size": 14 },
+    "DragDropCardBody": { "size": 16 }
+  },
+  "buttons": [
+    { "name": "Button_Primary", "fill": "Brand/Primary", "label": "Text/OnBrand" },
+    { "name": "Button_Secondary", "fill": "Neutral/Subtle", "label": "Brand/Primary" },
+    { "name": "Button_Ghost", "fill": "Neutral/Transparent", "label": "Brand/Primary" },
+    { "name": "Button_Primary_Small", "variantOf": "Button_Primary", "size": "Small" }
+  ],
+  "surfaces": [
+    { "name": "Surface_Card", "fill": "Neutral/Surface", "padding": 20 }
+  ],
+  "answers": { "right": "Feedback/Right", "wrong": "Feedback/Wrong" }
+}

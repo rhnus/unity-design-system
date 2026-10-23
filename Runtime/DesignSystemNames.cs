@@ -4,6 +4,7 @@
 /// </summary>
 public static class DesignSystemNames
 {
+    public const string PackageName = "com.nus.design-system";
     public const string MenuRoot = "Tools/Design System/";
     public const string TypographyMenuRoot = MenuRoot + "Typography/";
     public const string AssetMenuRoot = "Design System/";
