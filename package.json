@@ -1,0 +1,13 @@
+{
+  "name": "com.nus.design-system",
+  "displayName": "Design System",
+  "version": "0.1.0",
+  "unity": "6000.3",
+  "description": "A design system for uGUI: one theme of colour, size and type tokens, styles and variants for buttons, toggles, panels and drag cards, a scanner that styles existing controls with no visible change, a Check that catches broken layouts and text that doesn't fit, before/after Style Proposals, and a three-way Figma sync that never overwrites the game's own adaptations.",
+  "dependencies": {
+    "com.unity.ugui": "2.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.2"
+  },
+  "keywords": ["design system", "ui", "ugui", "tokens", "figma", "styles"],
+  "author": { "name": "NUS ADGBL team" }
+}
