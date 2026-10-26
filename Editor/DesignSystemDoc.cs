@@ -40,29 +40,21 @@ public static class DesignSystemDoc
             ? StyleConsolidation.MeasureUsage().Where(u => u.Style != null).ToDictionary(u => u.Style, u => u.References)
             : null;
 
-        report ??= CompareFromFiles(styles, theme);
+        report ??= FigmaSync.Preview();
         List<FigmaAdaptation> adaptations = FigmaSync.Load<List<FigmaAdaptation>>(FigmaSync.AdaptationsPath);
+        List<FigmaPlatformRule> rules = FigmaSync.Load<List<FigmaPlatformRule>>(FigmaSync.RulesPath);
 
         Directory.CreateDirectory(Folder);
         string path = $"{Folder}/{FileName}";
         File.WriteAllText(path, Generate(theme, styles, uses, DateTime.Now, report, adaptations, DesignSystemSettings.Find()?.DocumentTitle,
-                                         DesignSystemAssets.FindAll<UIStateStyle>()));
+                                         DesignSystemAssets.FindAll<UIStateStyle>(), rules));
         if (theme != null) File.WriteAllText($"{Folder}/tokens.json", DesignTokenJson.Export(theme));
         return path;
     }
 
-    private static FigmaReport CompareFromFiles(List<UIComponentStyle> styles, UITheme theme)
-    {
-        FigmaSnapshot now = FigmaSync.Load<FigmaSnapshot>(FigmaSync.SnapshotPath);
-        if (now == null) return null;
-        return FigmaSync.Compare(now, FigmaSync.Load<FigmaSnapshot>(FigmaSync.BaselinePath),
-            FigmaSync.Load<List<FigmaMapEntry>>(FigmaSync.MapPath) ?? new List<FigmaMapEntry>(),
-            FigmaSync.Load<List<FigmaAdaptation>>(FigmaSync.AdaptationsPath) ?? new List<FigmaAdaptation>(), styles, theme);
-    }
-
     public static string Generate(UITheme theme, IEnumerable<UIComponentStyle> styles, IReadOnlyDictionary<UIComponentStyle, int> uses, DateTime when,
                                   FigmaReport report = null, IList<FigmaAdaptation> adaptations = null, string title = null,
-                                  IEnumerable<UIStateStyle> stateStyles = null)
+                                  IEnumerable<UIStateStyle> stateStyles = null, IList<FigmaPlatformRule> rules = null)
     {
         var md = new StringBuilder();
         md.AppendLine($"# {title ?? "Design System"}");
@@ -76,9 +68,9 @@ public static class DesignSystemDoc
         else
             md.AppendLine($"> **Figma sync:** {report.snapshot.fileName} (version {report.snapshot.figmaVersion}), read {report.snapshot.syncedAt}. " +
                           (report.hasBaseline ? "Compared with the last accepted sync." :
-                              "**First sync:** there is no baseline yet, so every difference is listed *to triage* for a designer and a developer to settle once."));
+                              "**First sync:** there is no baseline yet, so every difference the platform rules don't cover is listed for the game to follow Figma."));
         md.AppendLine();
-        AppendAtAGlance(md, report, theme);
+        AppendAtAGlance(md, report, theme, rules);
         AppendBrief(md);
         AppendNaming(md);
         if (theme != null) AppendTheme(md, theme);
@@ -86,22 +78,23 @@ public static class DesignSystemDoc
         AppendComponents(md, theme, styles.Where(s => s != null).ToList(), uses, report);
         AppendStateStyles(md, theme, stateStyles?.Where(s => s != null).ToList());
         if (report != null) AppendComparison(md, report, theme);
-        AppendAdaptations(md, adaptations);
+        AppendRules(md, rules);
+        AppendAdaptations(md, adaptations, rules);
         AppendSinceBaseline(md, report);
         return md.ToString();
     }
 
     private static readonly FigmaResult[] OnPurpose = { FigmaResult.Adapted, FigmaResult.AdaptedFigmaMoved };
 
-    /// <summary>Every compared value in one of three groups, with a plain question for each thing a person must decide.</summary>
-    private static void AppendAtAGlance(StringBuilder md, FigmaReport report, UITheme theme)
+    /// <summary>Every compared value in one of three groups, with what the game must do for each difference no agreed rule covers.</summary>
+    private static void AppendAtAGlance(StringBuilder md, FigmaReport report, UITheme theme, IList<FigmaPlatformRule> rules)
     {
         md.AppendLine("## At a glance");
         md.AppendLine();
         if (report == null)
         {
             md.AppendLine("No Figma sync yet. After the first one, this section sorts every compared value into three groups: " +
-                          "**matches**, **differs on purpose** and **needs your decision**.");
+                          "**matches**, **differs by platform rule** and **to do**.");
             md.AppendLine();
             return;
         }
@@ -113,23 +106,26 @@ public static class DesignSystemDoc
         var outside = FigmaSync.ColoursOutsideTheme(report.snapshot, theme);
         int decisions = decide.Count + unconfirmed.Count + (outside.Count > 0 ? 1 : 0);
 
-        md.AppendLine("| Matches | Differs on purpose | Needs your decision |");
+        md.AppendLine("| Matches | Differs by platform rule | To do |");
         md.AppendLine("|---|---|---|");
         md.AppendLine($"| {matches.Count} value(s) | {onPurpose.Count} value(s) | {decisions} item(s) |");
         md.AppendLine();
 
-        md.AppendLine("### Needs your decision");
+        md.AppendLine("### To do");
         md.AppendLine();
-        if (decisions == 0) md.AppendLine("Nothing to decide.");
+        md.AppendLine("Work for a developer. The game follows Figma unless an agreed platform rule covers the difference; nothing here waits on the designer.");
+        md.AppendLine();
+        if (decisions == 0) md.AppendLine("Nothing to do.");
         else
         {
-            md.AppendLine("| Item | Figma | Game | Decide |");
+            md.AppendLine("| Item | Figma | Game | What to do |");
             md.AppendLine("|---|---|---|---|");
             foreach (FigmaFieldRow u in unconfirmed)
                 md.AppendLine(Row($"Mapping: {u.figmaComponent} → `{u.style}`", "—", "—",
                                   "Is this the right Unity style? If yes, confirm it in `component-map.json`."));
             foreach (FigmaFieldRow r in decide)
-                md.AppendLine(Row($"`{r.style}` {FieldName(r.field)}", r.figmaNow, r.unityNow ?? "each control's own", Question(r.result)));
+                md.AppendLine(Row($"`{r.style}` {FieldName(r.field)}", r.figmaNow, r.unityNow ?? "each control's own",
+                                  Question(r.result) + (r.markProblem != null ? $" Marked, but {LowerFirst(r.markProblem)}" : "")));
             if (outside.Count > 0)
                 md.AppendLine(Row($"{outside.Count} Figma colour(s) with no Unity token",
                                   string.Join(", ", outside.Take(3).Select(o => o.colour)) + (outside.Count > 3 ? " …" : ""), "—",
@@ -137,16 +133,20 @@ public static class DesignSystemDoc
         }
         md.AppendLine();
 
-        md.AppendLine("### Differs on purpose");
+        md.AppendLine("### Differs by platform rule");
         md.AppendLine();
-        if (onPurpose.Count == 0) md.AppendLine("None marked yet.");
+        if (onPurpose.Count == 0) md.AppendLine("None yet.");
         else
         {
             md.AppendLine("| Item | Figma | Game | Why |");
             md.AppendLine("|---|---|---|---|");
             foreach (FigmaFieldRow r in onPurpose)
+            {
+                FigmaPlatformRule rule = rules?.FirstOrDefault(x => x != null && x.id == r.adaptation?.rule);
                 md.AppendLine(Row($"`{r.style}` {FieldName(r.field)}", r.figmaNow, r.unityNow ?? "each control's own",
-                                  (r.adaptation?.reason ?? "") + (r.result == FigmaResult.AdaptedFigmaMoved ? " Figma has changed since this was marked: check the reason still holds." : "")));
+                                  $"{rule?.rule} (`{r.adaptation?.rule}`)" + (string.IsNullOrEmpty(r.adaptation?.reason) ? "" : $" {r.adaptation.reason}")
+                                  + (r.result == FigmaResult.AdaptedFigmaMoved ? " Figma has changed since: check the rule still covers the new value." : "")));
+            }
         }
         md.AppendLine();
 
@@ -158,9 +158,13 @@ public static class DesignSystemDoc
         md.AppendLine();
     }
 
-    private static string FieldName(string field) => field switch
+    internal static string FieldName(string field) => field.Contains('.')
+        ? $"{field.Substring(0, field.LastIndexOf('.'))} {FieldName(field.Substring(field.LastIndexOf('.') + 1))}"
+        : field switch
     {
         "fill" => "fill colour",
+        "border" => "border colour",
+        "ink" => "text colour",
         "corner" => "corner radius",
         "labelColour" => "label colour",
         "labelSize" => "label size",
@@ -170,12 +174,14 @@ public static class DesignSystemDoc
 
     private static string Question(FigmaResult result) => result switch
     {
-        FigmaResult.ToTriage => "Keep the game's value, or follow Figma?",
-        FigmaResult.UnityChanged => "The game changed this since the last sync. Keep it, or go back to Figma?",
-        FigmaResult.DesignUpdate => "Figma changed this. Update the game to match? (Applied through Style Proposals.)",
-        FigmaResult.Conflict => "Figma and the game both changed this. Which value should both use?",
+        FigmaResult.FollowFigma => "Change the game to Figma's value, or cite an agreed platform rule.",
+        FigmaResult.UnityChanged => "The game changed this since the last sync. Go back to Figma's value, or cite an agreed platform rule.",
+        FigmaResult.DesignUpdate => "Figma changed this. Apply it to the game through Style Proposals.",
+        FigmaResult.Conflict => "Figma and the game both changed this. Apply Figma's new value, or cite an agreed platform rule.",
         _ => "",
     };
+
+    private static string LowerFirst(string s) => string.IsNullOrEmpty(s) ? s : char.ToLowerInvariant(s[0]) + s.Substring(1);
 
     private static void AppendBrief(StringBuilder md)
     {
@@ -184,11 +190,11 @@ public static class DesignSystemDoc
         md.AppendLine("You have this file and a Figma connector. This file records what the Unity game ships. Compare it with the Figma design library:");
         md.AppendLine();
         md.AppendLine("1. For each row under **Theme** and **Components**, find the Figma variable, text style or component named in its *Figma name* column (scheme below).");
-        md.AppendLine("2. Report in the same three groups as **At a glance**: *matches*; *differs on purpose* (rows under **Adapted for the game**, with their reason); *needs your decision* (every other difference, and anything missing in Figma or in Unity), showing both values.");
-        md.AppendLine("3. Don't recommend changing a value that differs on purpose unless the designer asks.");
+        md.AppendLine("2. Report in the same three groups as **At a glance**: *matches*; *differs by platform rule* (with the rule from **Platform rules**); *to do* (every other difference, and anything missing in Figma or in Unity), showing both values.");
+        md.AppendLine("3. Figma is the source of truth. Don't ask the designer to approve or review the game's values; a value differing by platform rule is explained, not questioned.");
         md.AppendLine("4. Don't edit, detach or rename library components or variables. If the designer asks for draft fixes, make them on a separate page named **Unity review**.");
         md.AppendLine("5. For exact values, read `tokens.json` beside this file (W3C design tokens).");
-        md.AppendLine("6. End with a short list of decisions for the designer: for each difference, *update Figma to match the game* or *the game should follow Figma*.");
+        md.AppendLine("6. End with what the developers will change in the game to follow Figma. Raise something with the designer only if a Figma value looks unworkable in the game and no rule covers it.");
         md.AppendLine();
     }
 
@@ -360,6 +366,32 @@ public static class DesignSystemDoc
                 md.AppendLine(Row(u.figmaName, string.IsNullOrEmpty(u.unityStyle) ? "—" : $"`{u.unityStyle}`", u.note));
             md.AppendLine();
         }
+        if (report.stateGaps.Count > 0)
+        {
+            md.AppendLine("### States only one side has");
+            md.AppendLine();
+            md.AppendLine("A state the Figma component has and its Unity state style doesn't, or the other way round. Nothing is compared for it.");
+            md.AppendLine();
+            md.AppendLine("| Unity style | Figma component | State | Only in |");
+            md.AppendLine("|---|---|---|---|");
+            foreach (FigmaStateGap g in report.stateGaps)
+                md.AppendLine(Row($"`{g.style}`", g.component, g.state, g.onlyIn));
+            md.AppendLine();
+        }
+        if (report.unmappedStateStyles.Count > 0)
+        {
+            md.AppendLine("### State styles no Figma component follows");
+            md.AppendLine();
+            foreach (string s in report.unmappedStateStyles) md.AppendLine($"- `{Cell(s)}`: no Figma component follows it (Unity only).");
+            md.AppendLine();
+        }
+        if (report.notUsed.Count > 0)
+        {
+            md.AppendLine("### Figma components the game doesn't use");
+            md.AppendLine();
+            foreach (FigmaMapEntry m in report.notUsed) md.AppendLine($"- {Cell(m.figmaName)}: {Cell(m.note)}");
+            md.AppendLine();
+        }
         var outside = FigmaSync.ColoursOutsideTheme(report.snapshot, theme);
         if (outside.Count > 0)
         {
@@ -382,20 +414,46 @@ public static class DesignSystemDoc
         }
     }
 
-    private static void AppendAdaptations(StringBuilder md, IList<FigmaAdaptation> adaptations)
+    private static void AppendRules(StringBuilder md, IList<FigmaPlatformRule> rules)
+    {
+        md.AppendLine("## Platform rules");
+        md.AppendLine();
+        md.AppendLine("The only reasons the game may differ from Figma, agreed once with the designer in `figma/rules.json`. " +
+                      "A rule nobody has agreed is a proposal for the next rules session and covers nothing.");
+        md.AppendLine();
+        List<FigmaPlatformRule> listed = rules?.Where(r => r != null).ToList() ?? new List<FigmaPlatformRule>();
+        if (!listed.Any(r => r.Agreed))
+        {
+            md.AppendLine("No platform rules are agreed yet, so the game follows Figma everywhere.");
+            md.AppendLine();
+        }
+        if (listed.Count == 0) return;
+        md.AppendLine("| Rule | What it says | Covers | Agreed |");
+        md.AppendLine("|---|---|---|---|");
+        foreach (FigmaPlatformRule r in listed)
+            md.AppendLine(Row($"`{r.id}`", r.rule, r.fields == null || r.fields.Count == 0 ? "any field" : string.Join(", ", r.fields),
+                              r.Agreed ? $"{r.agreedBy}, {r.date}" : "*proposed: covers nothing until the designer agrees it*"));
+        md.AppendLine();
+    }
+
+    private static void AppendAdaptations(StringBuilder md, IList<FigmaAdaptation> adaptations, IList<FigmaPlatformRule> rules)
     {
         md.AppendLine("## Adapted for the game");
         md.AppendLine();
         if (adaptations == null || adaptations.Count == 0)
         {
-            md.AppendLine("Values the game changed on purpose, with the reason and who decided. None are recorded yet: they are marked during the first Figma sync.");
+            md.AppendLine("Values the game keeps under an agreed platform rule, with who marked them. None are recorded yet.");
             md.AppendLine();
             return;
         }
-        md.AppendLine("| Unity style | Field | Unity | Figma when marked | Reason | Decided |");
-        md.AppendLine("|---|---|---|---|---|---|");
+        md.AppendLine("| Unity style | Field | Unity | Figma when marked | Platform rule | Note | Marked |");
+        md.AppendLine("|---|---|---|---|---|---|---|");
         foreach (FigmaAdaptation a in adaptations)
-            md.AppendLine(Row($"`{a.style}`", a.field, a.unityValue, a.figmaValue, a.reason, $"{a.decidedBy}, {a.date}"));
+        {
+            string problem = FigmaSync.CheckMark(a, rules);
+            md.AppendLine(Row($"`{a.style}`", a.field, a.unityValue, a.figmaValue, problem == null ? $"`{a.rule}`" : $"**Doesn't count:** {LowerFirst(problem)}",
+                              a.reason ?? "", $"{a.decidedBy}, {a.date}"));
+        }
         md.AppendLine();
     }
 

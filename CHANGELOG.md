@@ -7,6 +7,21 @@
   as in the Figma variant, gives a fill, border, ink and accent token and an opacity; the component keeps its own
   state machine and calls `Resolve(state, fallback)`. Anything the style leaves empty keeps the component's colour.
 - The generated design system doc lists every state style under **Components ▸ State styles**.
+- Agent command `figma-unmap` marks a Figma component as not used in the game, so it is neither compared nor
+  suggested again; `figma-confirm` adds the sync's suggestion when the map doesn't have it yet. `FigmaSync.Preview`
+  compares the files without writing anything.
+- **The Figma sync compares state styles.** A `component-map.json` entry with `"kind": "state"` maps a Figma
+  component set to a `UIStateStyle`: each state is matched to the variant with the same `State` (case and spaces
+  ignored) and compared on fill, border (Figma stroke) and ink (label colour) as fields such as `Selected.fill`, under
+  the same three-way rule, adaptations and platform rules. States only one side has, and state styles no component
+  follows, are listed in the report and the doc. A component named like a state style (`G3/Name tag` →
+  `State_G3_NameTag`) is suggested, never confirmed. A platform rule's `fields` entry `fill` covers every state's fill.
+- **Figma wins unless a platform rule says otherwise.** A Figma adaptation now counts only when it cites a rule in
+  `figma/rules.json` that the designer has agreed and that covers the field; any other difference is listed as
+  *follow Figma*, with the reason a mark doesn't count. `figma-mark` takes a required `rule` (and an optional
+  `reason` note) and refuses a rule that wouldn't count. The doc's groups are now **matches**, **differs by platform
+  rule** and **to do**, with a new **Platform rules** section; the result *to triage* is now *follow Figma*
+  (`FigmaResult.FollowFigma`). `FigmaSync.Compare` takes the rules after the adaptations.
 
 ## 0.2.0 — 2026-10-23
 

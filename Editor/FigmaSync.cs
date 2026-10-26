@@ -53,34 +53,54 @@ public class FigmaLabel
 
 // ---- Files the team edits ----
 
-/// <summary>Which Figma component a Unity style follows, and which of its variants are the resting, hover and disabled looks.</summary>
+/// <summary>
+/// Which Figma component a Unity style follows. A component style names the variants that are its resting, hover and
+/// disabled looks; a state style (<see cref="kind"/> = <see cref="StateKind"/>) follows every variant by its State.
+/// </summary>
 public class FigmaMapEntry
 {
+    public const string StateKind = "state";
+
     public string figmaId, figmaName, unityStyle, restingVariant, hoverVariant, disabledVariant;
+    /// <summary>Empty for a <see cref="UIComponentStyle"/>; <see cref="StateKind"/> for a <see cref="UIStateStyle"/>.</summary>
+    public string kind;
     /// <summary>False while the entry is only the sync's suggestion; a person confirms it once.</summary>
     public bool confirmed;
     public string note = "";
 }
 
-/// <summary>A value the game changed on purpose: the sync keeps it until the line is removed.</summary>
+/// <summary>
+/// A value the game keeps on purpose. It counts only while <see cref="rule"/> names an agreed
+/// <see cref="FigmaPlatformRule"/> that covers the field; see <see cref="FigmaSync.CheckMark"/>.
+/// </summary>
 public class FigmaAdaptation
 {
-    public string style, field, unityValue, figmaValue, reason, decidedBy, date;
+    public string style, field, rule, unityValue, figmaValue, reason, decidedBy, date;
+}
+
+/// <summary>A reason the game may differ from Figma, agreed once with the designer. Until someone agrees it, it is a proposal and covers nothing.</summary>
+public class FigmaPlatformRule
+{
+    public string id, rule, agreedBy, date;
+    /// <summary>The fields the rule may cover; empty covers any field.</summary>
+    public List<string> fields = new List<string>();
+
+    [JsonIgnore] public bool Agreed => !string.IsNullOrEmpty(agreedBy);
 }
 
 /// <summary>What the three-way compare decided for one field.</summary>
 public enum FigmaResult
 {
     InSync,
-    /// <summary>First sync, or the component is new to the baseline: a person marks it adapted or "follow Figma".</summary>
-    ToTriage,
-    /// <summary>Marked as adapted for the game, and Figma hasn't moved since.</summary>
+    /// <summary>First sync, or the component is new to the baseline, and no agreed rule covers the difference.</summary>
+    FollowFigma,
+    /// <summary>An agreed platform rule covers the difference, and Figma hasn't moved since.</summary>
     Adapted,
-    /// <summary>Unity differs from a Figma value that hasn't changed, and nobody has marked it yet.</summary>
+    /// <summary>Unity differs from a Figma value that hasn't changed, and no agreed rule covers it.</summary>
     UnityChanged,
-    /// <summary>Figma changed and Unity still has the old Figma value: propose the change.</summary>
+    /// <summary>Figma changed and Unity still has the old Figma value.</summary>
     DesignUpdate,
-    /// <summary>Marked adapted, but Figma has moved since: reported, the mark still wins.</summary>
+    /// <summary>An agreed rule covers it, but Figma has moved since: reported, the rule still wins.</summary>
     AdaptedFigmaMoved,
     /// <summary>Figma changed and Unity differs from both the old and the new Figma value.</summary>
     Conflict,
@@ -88,10 +108,18 @@ public enum FigmaResult
 
 public class FigmaFieldRow
 {
-    public string style, figmaComponent, field, figmaNow, figmaBaseline, unityNow;
+    public string style, figmaId, figmaVariantId, figmaComponent, field, figmaNow, figmaBaseline, unityNow;
     public bool mappingConfirmed;
     public FigmaResult result;
     public FigmaAdaptation adaptation;
+    /// <summary>Why <see cref="adaptation"/> doesn't count, when it doesn't.</summary>
+    public string markProblem;
+}
+
+public class FigmaStateGap
+{
+    /// <summary>"Figma" or "Unity": the side that has the state.</summary>
+    public string style, component, state, onlyIn;
 }
 
 public class FigmaReport
@@ -105,15 +133,21 @@ public class FigmaReport
     public List<FigmaComponent> removed = new List<FigmaComponent>();
     /// <summary>Map entries naming a Unity style that no longer exists.</summary>
     public List<FigmaMapEntry> missingStyles = new List<FigmaMapEntry>();
+    /// <summary>States a mapped state style or its Figma component has and the other lacks; nothing is compared for them.</summary>
+    public List<FigmaStateGap> stateGaps = new List<FigmaStateGap>();
+    /// <summary>State styles no map entry or suggestion follows: they exist only in Unity.</summary>
+    public List<string> unmappedStateStyles = new List<string>();
+    /// <summary>Map entries with no Unity style: components someone marked as not used in the game, never suggested again.</summary>
+    public List<FigmaMapEntry> notUsed = new List<FigmaMapEntry>();
 
     public IEnumerable<FigmaFieldRow> RowsFor(string style) => rows.Where(r => r.style == style);
 }
 
 /// <summary>
 /// Compares a Figma snapshot with the Design System, three ways: Figma now, Figma at the last accepted sync (the
-/// baseline) and Unity now. It changes nothing in Unity. Only a Figma change on a value Unity still has from the
-/// baseline is a design update to propose; anything the game changed is kept, or raised for people to decide.
-/// The rules are in docs/figma-unity-pipeline.md.
+/// baseline) and Unity now. It changes nothing in Unity. Figma wins: the game may differ only where it cites a
+/// platform rule agreed with the designer (rules.json), and every other difference is listed for a developer to
+/// bring the game back to Figma. The rules are in docs/figma-unity-pipeline.md.
 /// </summary>
 public static class FigmaSync
 {
@@ -122,8 +156,14 @@ public static class FigmaSync
     public static string BaselinePath => $"{Folder}/baseline/components.json";
     public static string MapPath => $"{Folder}/component-map.json";
     public static string AdaptationsPath => $"{Folder}/adaptations.json";
+    public static string RulesPath => $"{Folder}/rules.json";
+
+    /// <summary>Where Tools/figma_sync.py saves a variant's PNG: the id with ':' as '-'.</summary>
+    public static string ImagePath(string variantId) => $"{Folder}/images/{variantId.Replace(':', '-')}.png";
 
     public static readonly string[] Fields = { "fill", "corner", "height", "labelColour", "labelSize", "labelFont" };
+    /// <summary>Compared per state as "State.field": Figma's fill, stroke and label colour.</summary>
+    public static readonly string[] StateFields = { "fill", "border", "ink" };
 
     // ---- Running ----
 
@@ -138,17 +178,98 @@ public static class FigmaSync
         FigmaSnapshot baseline = Load<FigmaSnapshot>(BaselinePath);
         List<FigmaMapEntry> map = Load<List<FigmaMapEntry>>(MapPath) ?? new List<FigmaMapEntry>();
         List<FigmaAdaptation> adaptations = Load<List<FigmaAdaptation>>(AdaptationsPath) ?? new List<FigmaAdaptation>();
+        List<FigmaPlatformRule> rules = Load<List<FigmaPlatformRule>>(RulesPath) ?? new List<FigmaPlatformRule>();
         UITheme theme = DesignSystemAssets.FindSingle<UITheme>();
         List<UIComponentStyle> styles = DesignSystemAssets.FindAll<UIComponentStyle>();
+        List<UIStateStyle> stateStyles = DesignSystemAssets.FindAll<UIStateStyle>();
 
-        FigmaReport report = Compare(now, baseline, map, adaptations, styles, theme);
+        FigmaReport report = Compare(now, baseline, map, adaptations, rules, styles, theme, stateStyles);
         foreach (FigmaMapEntry suggestion in report.unmapped.Where(u => !string.IsNullOrEmpty(u.unityStyle)))
             map.Add(suggestion);
-        Save(MapPath, map.OrderBy(m => m.figmaName, StringComparer.Ordinal).ToList());
+        SaveMap(map);
         if (!File.Exists(AdaptationsPath)) Save(AdaptationsPath, adaptations);
+        if (!File.Exists(RulesPath)) Save(RulesPath, rules);
         DesignSystemDoc.Write(report: report);
         return report;
     }
+
+    /// <summary>Compares the files as they are and writes nothing. Null when there is no snapshot yet.</summary>
+    public static FigmaReport Preview()
+    {
+        FigmaSnapshot now = Load<FigmaSnapshot>(SnapshotPath);
+        if (now == null) return null;
+        return Compare(now, Load<FigmaSnapshot>(BaselinePath), Load<List<FigmaMapEntry>>(MapPath) ?? new List<FigmaMapEntry>(),
+                       Load<List<FigmaAdaptation>>(AdaptationsPath) ?? new List<FigmaAdaptation>(),
+                       Load<List<FigmaPlatformRule>>(RulesPath) ?? new List<FigmaPlatformRule>(),
+                       DesignSystemAssets.FindAll<UIComponentStyle>(), DesignSystemAssets.FindSingle<UITheme>(), DesignSystemAssets.FindAll<UIStateStyle>());
+    }
+
+    /// <summary>Confirms a Figma component's mapping in component-map.json; see <see cref="Confirm(List{FigmaMapEntry}, IEnumerable{FigmaMapEntry}, string, string, string, string)"/>.</summary>
+    public static FigmaMapEntry Confirm(string figma, string style, string by)
+    {
+        List<FigmaMapEntry> map = Load<List<FigmaMapEntry>>(MapPath) ?? new List<FigmaMapEntry>();
+        string kind = string.IsNullOrEmpty(style) ? null
+            : DesignSystemAssets.FindAll<UIStateStyle>().Any(s => s != null && s.name == style) ? FigmaMapEntry.StateKind : null;
+        FigmaMapEntry entry = Confirm(map, FindEntry(map, figma) == null ? Preview()?.unmapped : null, figma, style, kind, by);
+        SaveMap(map);
+        return entry;
+    }
+
+    /// <summary>
+    /// Confirms the entry for a Figma component (id or name), first adding the sync's suggestion when the map doesn't
+    /// have it yet. A <paramref name="style"/> remaps it, with <paramref name="kind"/> saying whether that is a state style.
+    /// </summary>
+    public static FigmaMapEntry Confirm(List<FigmaMapEntry> map, IEnumerable<FigmaMapEntry> suggestions, string figma, string style, string kind, string by)
+    {
+        FigmaMapEntry entry = FindEntry(map, figma);
+        bool isNew = entry == null;
+        if (isNew) entry = FindEntry(suggestions, figma) ?? throw new ArgumentException($"No map entry for '{figma}'. Run figma-compare first.");
+        if (string.IsNullOrEmpty(style) && string.IsNullOrEmpty(entry.unityStyle))
+            throw new ArgumentException($"'{entry.figmaName}' has no Unity style to confirm. Name one with \"style\".");
+        if (isNew) map.Add(entry);
+        if (!string.IsNullOrEmpty(style)) { entry.unityStyle = style; entry.kind = kind; }
+        entry.confirmed = true;
+        entry.note = $"Confirmed by {by} on {DateTime.Now:yyyy-MM-dd}.";
+        return entry;
+    }
+
+    /// <summary>Records in component-map.json that the game doesn't use a Figma component; see <see cref="Unmap(List{FigmaMapEntry}, IEnumerable{FigmaMapEntry}, string, string)"/>.</summary>
+    public static FigmaMapEntry Unmap(string figma, string by)
+    {
+        List<FigmaMapEntry> map = Load<List<FigmaMapEntry>>(MapPath) ?? new List<FigmaMapEntry>();
+        FigmaMapEntry entry = Unmap(map, FindEntry(map, figma) == null ? Preview()?.unmapped : null, figma, by);
+        SaveMap(map);
+        return entry;
+    }
+
+    /// <summary>
+    /// Leaves a Figma component (id or name) with no Unity style: it is neither compared nor suggested again, and the
+    /// report lists it under <see cref="FigmaReport.notUsed"/>. Confirming it with a style maps it again.
+    /// </summary>
+    public static FigmaMapEntry Unmap(List<FigmaMapEntry> map, IEnumerable<FigmaMapEntry> unmapped, string figma, string by)
+    {
+        FigmaMapEntry entry = FindEntry(map, figma);
+        if (entry == null)
+        {
+            FigmaMapEntry seen = FindEntry(unmapped, figma) ?? throw new ArgumentException($"No Figma component '{figma}' in the map or the snapshot.");
+            entry = new FigmaMapEntry { figmaId = seen.figmaId, figmaName = seen.figmaName };
+            map.Add(entry);
+        }
+        entry.unityStyle = null;
+        entry.kind = null;
+        entry.confirmed = true;
+        entry.note = $"Not used in the game. Decided by {by} on {DateTime.Now:yyyy-MM-dd}.";
+        return entry;
+    }
+
+    private static FigmaMapEntry FindEntry(IEnumerable<FigmaMapEntry> entries, string figma) =>
+        entries?.FirstOrDefault(m => m != null && (m.figmaId == figma || m.figmaName == figma));
+
+    /// <summary>The agreed rules a mark on this field could cite and count.</summary>
+    public static List<FigmaPlatformRule> RulesCovering(string field, IList<FigmaPlatformRule> rules) =>
+        (rules ?? new List<FigmaPlatformRule>()).Where(r => r != null && CheckMark(new FigmaAdaptation { field = field, rule = r.id }, rules) == null).ToList();
+
+    private static void SaveMap(List<FigmaMapEntry> map) => Save(MapPath, map.OrderBy(m => m.figmaName, StringComparer.Ordinal).ToList());
 
     /// <summary>Makes the current snapshot the baseline, once the sync has been reviewed and the triage done.</summary>
     public static void AcceptBaseline()
@@ -158,19 +279,22 @@ public static class FigmaSync
         File.Copy(SnapshotPath, BaselinePath, overwrite: true);
     }
 
-    /// <summary>Records that a style's field differs from Figma on purpose, with the values as they are now.</summary>
-    public static void MarkAdapted(string style, string field, string reason, string decidedBy)
+    /// <summary>
+    /// Records that a style's field keeps the game's value under an agreed platform rule, with the values as they are
+    /// now. Refuses, before writing anything, a rule that wouldn't count.
+    /// </summary>
+    public static void MarkAdapted(string style, string field, string rule, string note, string decidedBy)
     {
+        var mark = new FigmaAdaptation { style = style, field = field, rule = rule, reason = note, decidedBy = decidedBy, date = DateTime.Now.ToString("yyyy-MM-dd") };
+        if (CheckMark(mark, Load<List<FigmaPlatformRule>>(RulesPath)) is string problem) throw new ArgumentException(problem);
         FigmaReport report = Run();
         FigmaFieldRow row = report.rows.FirstOrDefault(r => r.style == style && r.field == field)
                             ?? throw new ArgumentException($"No compared field '{field}' on '{style}'. Is the style mapped?");
+        mark.unityValue = row.unityNow;
+        mark.figmaValue = row.figmaNow;
         List<FigmaAdaptation> list = Load<List<FigmaAdaptation>>(AdaptationsPath) ?? new List<FigmaAdaptation>();
         list.RemoveAll(a => a.style == style && a.field == field);
-        list.Add(new FigmaAdaptation
-        {
-            style = style, field = field, unityValue = row.unityNow, figmaValue = row.figmaNow, reason = reason,
-            decidedBy = decidedBy, date = DateTime.Now.ToString("yyyy-MM-dd"),
-        });
+        list.Add(mark);
         Save(AdaptationsPath, list.OrderBy(a => a.style, StringComparer.Ordinal).ThenBy(a => a.field, StringComparer.Ordinal).ToList());
     }
 
@@ -196,7 +320,7 @@ public static class FigmaSync
     private static void AcceptFromMenu()
     {
         if (!EditorUtility.DisplayDialog("Accept Figma snapshot", "Make the current Figma snapshot the baseline? Do this after the " +
-                "sync has been reviewed and every 'to triage' row is marked adapted or settled.", "Accept", "Cancel")) return;
+                "sync has been reviewed and every 'follow Figma' row is either fixed in the game or covered by an agreed rule.", "Accept", "Cancel")) return;
         AcceptBaseline();
         Debug.Log($"[DesignSystem] {SnapshotPath} is now the baseline.");
     }
@@ -207,62 +331,153 @@ public static class FigmaSync
     public static string Label(FigmaResult result) => result switch
     {
         FigmaResult.InSync => "in sync",
-        FigmaResult.ToTriage => "to triage",
-        FigmaResult.Adapted => "adapted for the game",
-        FigmaResult.UnityChanged => "changed in Unity, not marked",
-        FigmaResult.DesignUpdate => "design update to review",
-        FigmaResult.AdaptedFigmaMoved => "adapted; Figma moved since",
-        _ => "conflict",
+        FigmaResult.FollowFigma => "follow Figma",
+        FigmaResult.Adapted => "adapted by platform rule",
+        FigmaResult.UnityChanged => "changed in Unity: follow Figma",
+        FigmaResult.DesignUpdate => "design update to apply",
+        FigmaResult.AdaptedFigmaMoved => "adapted by rule; Figma moved since",
+        _ => "both changed: follow Figma",
     };
 
     // ---- Comparing ----
 
-    public static FigmaReport Compare(FigmaSnapshot now, FigmaSnapshot baseline, IList<FigmaMapEntry> map,
-                                      IList<FigmaAdaptation> adaptations, IList<UIComponentStyle> styles, UITheme theme)
+    public static FigmaReport Compare(FigmaSnapshot now, FigmaSnapshot baseline, IList<FigmaMapEntry> map, IList<FigmaAdaptation> adaptations,
+                                      IList<FigmaPlatformRule> rules, IList<UIComponentStyle> styles, UITheme theme,
+                                      IList<UIStateStyle> stateStyles = null)
     {
         var report = new FigmaReport { snapshot = now, hasBaseline = baseline != null };
         foreach (FigmaMapEntry entry in map.Where(m => !string.IsNullOrEmpty(m.unityStyle)))
         {
             FigmaComponent component = now.Find(entry.figmaId);
             if (component == null) continue;
+            FigmaComponent oldComponent = baseline?.Find(entry.figmaId);
+            if (entry.kind == FigmaMapEntry.StateKind)
+            {
+                UIStateStyle stateStyle = stateStyles?.FirstOrDefault(s => s != null && s.name == entry.unityStyle);
+                if (stateStyle == null) report.missingStyles.Add(entry);
+                else CompareStates(report, entry, component, oldComponent, stateStyle, theme, adaptations, rules);
+                continue;
+            }
             UIComponentStyle style = styles.FirstOrDefault(s => s != null && s.name == entry.unityStyle);
             if (style == null) { report.missingStyles.Add(entry); continue; }
 
             FigmaVariant current = component.Variant(entry.restingVariant) ?? component.RestingVariant();
-            FigmaComponent oldComponent = baseline?.Find(entry.figmaId);
             FigmaVariant old = oldComponent == null ? null : oldComponent.Variant(current?.name) ?? oldComponent.RestingVariant();
-            Dictionary<string, string> figma = FigmaValues(current), figmaOld = old == null ? null : FigmaValues(old), unity = UnityValues(style, theme);
-
-            foreach (string field in Fields)
-            {
-                figma.TryGetValue(field, out string f);
-                if (f == null) continue;
-                unity.TryGetValue(field, out string u);
-                string b = null;
-                figmaOld?.TryGetValue(field, out b);
-                FigmaAdaptation mark = adaptations.FirstOrDefault(a => a.style == style.name && a.field == field);
-                report.rows.Add(new FigmaFieldRow
-                {
-                    style = style.name, figmaComponent = $"{component.name}{(current != null && current.name != "" ? $" · {current.name}" : "")}",
-                    field = field, figmaNow = f, figmaBaseline = b, unityNow = u, mappingConfirmed = entry.confirmed,
-                    adaptation = mark, result = Decide(f, b, u, oldComponent != null, mark != null),
-                });
-            }
+            AddRows(report, entry, style.name, current?.id, $"{component.name}{(current != null && current.name != "" ? $" · {current.name}" : "")}", Fields,
+                    FigmaValues(current), old == null ? null : FigmaValues(old), UnityValues(style, theme), oldComponent != null, adaptations, rules);
         }
 
+        report.notUsed.AddRange(map.Where(m => string.IsNullOrEmpty(m.unityStyle) && now.Find(m.figmaId) != null));
         var mapped = new HashSet<string>(map.Select(m => m.figmaId));
         foreach (FigmaComponent c in now.components.Where(c => !mapped.Contains(c.id)))
-            report.unmapped.Add(Suggest(c, styles, theme));
+            report.unmapped.Add(SuggestState(c, stateStyles) ?? Suggest(c, styles, theme));
+        if (stateStyles != null)
+        {
+            var followed = new HashSet<string>(map.Concat(report.unmapped).Where(m => m.kind == FigmaMapEntry.StateKind).Select(m => m.unityStyle));
+            report.unmappedStateStyles.AddRange(stateStyles.Where(s => s != null && !followed.Contains(s.name)).Select(s => s.name)
+                                                           .OrderBy(n => n, StringComparer.Ordinal));
+        }
         if (baseline != null)
             report.removed.AddRange(baseline.components.Where(c => now.Find(c.id) == null));
         return report;
     }
 
-    /// <summary>The three-way rule for one value; see <see cref="FigmaResult"/>.</summary>
+    private static void AddRows(FigmaReport report, FigmaMapEntry entry, string style, string variantId, string component, IEnumerable<string> fields,
+                                Dictionary<string, string> figma, Dictionary<string, string> figmaOld, Dictionary<string, string> unity,
+                                bool hasBaseline, IList<FigmaAdaptation> adaptations, IList<FigmaPlatformRule> rules)
+    {
+        foreach (string field in fields)
+        {
+            figma.TryGetValue(field, out string f);
+            if (f == null) continue;
+            unity.TryGetValue(field, out string u);
+            string b = null;
+            figmaOld?.TryGetValue(field, out b);
+            FigmaAdaptation mark = adaptations.FirstOrDefault(a => a.style == style && a.field == field);
+            string problem = mark == null ? null : CheckMark(mark, rules);
+            report.rows.Add(new FigmaFieldRow
+            {
+                style = style, figmaId = entry.figmaId, figmaVariantId = variantId, figmaComponent = component, field = field,
+                figmaNow = f, figmaBaseline = b, unityNow = u,
+                mappingConfirmed = entry.confirmed, adaptation = mark, markProblem = problem,
+                result = Decide(f, b, u, hasBaseline, mark != null && problem == null),
+            });
+        }
+    }
+
+    /// <summary>
+    /// Each state the style and the component both have, matched by name ignoring case and spaces, on
+    /// <see cref="StateFields"/>. A state on one side only is listed in <see cref="FigmaReport.stateGaps"/>, Figma's first.
+    /// </summary>
+    private static void CompareStates(FigmaReport report, FigmaMapEntry entry, FigmaComponent component, FigmaComponent oldComponent,
+                                      UIStateStyle style, UITheme theme, IList<FigmaAdaptation> adaptations, IList<FigmaPlatformRule> rules)
+    {
+        UITheme source = style.Theme != null ? style.Theme : theme;
+        var shared = new HashSet<string>();
+        var unityOnly = new List<FigmaStateGap>();
+        foreach (UIStateStyle.State state in style.States.Where(s => s != null && !string.IsNullOrEmpty(s.name)))
+        {
+            FigmaVariant variant = VariantForState(component, state.name);
+            if (variant == null)
+            {
+                unityOnly.Add(new FigmaStateGap { style = style.name, component = component.name, state = state.name, onlyIn = "Unity" });
+                continue;
+            }
+            shared.Add(StateKey(state.name));
+            FigmaVariant old = oldComponent == null ? null : VariantForState(oldComponent, state.name);
+            AddRows(report, entry, style.name, variant.id, $"{component.name} · {variant.name}", StateFields.Select(f => $"{state.name}.{f}"),
+                    StateValues(state.name, variant), old == null ? null : StateValues(state.name, old), UnityStateValues(state, source),
+                    old != null, adaptations, rules);
+        }
+        foreach (string figmaState in component.variants.Select(StateOf).Where(s => s != null).Distinct().Where(s => !shared.Contains(StateKey(s))))
+            report.stateGaps.Add(new FigmaStateGap { style = style.name, component = component.name, state = figmaState, onlyIn = "Figma" });
+        report.stateGaps.AddRange(unityOnly);
+    }
+
+    private static string StateOf(FigmaVariant v) => v.props != null && v.props.TryGetValue("State", out string s) ? s : null;
+
+    private static string StateKey(string name) => new string(name.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    private static FigmaVariant VariantForState(FigmaComponent component, string state) =>
+        component.variants.FirstOrDefault(v => StateOf(v) is string s && StateKey(s) == StateKey(state));
+
+    public static Dictionary<string, string> StateValues(string state, FigmaVariant v)
+    {
+        var values = new Dictionary<string, string>();
+        if (v.fill != null) values[$"{state}.fill"] = v.fill;
+        if (v.stroke != null) values[$"{state}.border"] = v.stroke;
+        if (v.label?.colour != null) values[$"{state}.ink"] = v.label.colour;
+        return values;
+    }
+
+    /// <summary>What a state paints, in the same terms; a token the state leaves empty is absent, as the component keeps its own colour.</summary>
+    public static Dictionary<string, string> UnityStateValues(UIStateStyle.State state, UITheme theme)
+    {
+        var values = new Dictionary<string, string>();
+        if (state.fill.TryResolve(theme, out Color fill)) values[$"{state.name}.fill"] = Hex(fill);
+        if (state.border.TryResolve(theme, out Color border)) values[$"{state.name}.border"] = Hex(border);
+        if (state.ink.TryResolve(theme, out Color ink)) values[$"{state.name}.ink"] = Hex(ink);
+        return values;
+    }
+
+    /// <summary>Why a mark doesn't count, or null when it cites an agreed rule that covers its field.</summary>
+    public static string CheckMark(FigmaAdaptation mark, IEnumerable<FigmaPlatformRule> rules)
+    {
+        if (string.IsNullOrEmpty(mark.rule)) return "It cites no platform rule.";
+        FigmaPlatformRule rule = rules?.FirstOrDefault(r => r != null && r.id == mark.rule);
+        if (rule == null) return $"It cites the rule '{mark.rule}', which isn't in rules.json.";
+        if (!rule.Agreed) return $"The rule '{rule.id}' isn't agreed with the designer yet.";
+        string bare = mark.field?.Substring(mark.field.LastIndexOf('.') + 1);
+        if (rule.fields != null && rule.fields.Count > 0 && !rule.fields.Contains(mark.field) && !rule.fields.Contains(bare))
+            return $"The rule '{rule.id}' doesn't cover {mark.field}.";
+        return null;
+    }
+
+    /// <summary>The three-way rule for one value; see <see cref="FigmaResult"/>. <paramref name="marked"/> means a mark that passes <see cref="CheckMark"/>.</summary>
     public static FigmaResult Decide(string figmaNow, string figmaBaseline, string unityNow, bool hasBaseline, bool marked)
     {
         bool unityMatchesNow = Same(unityNow, figmaNow);
-        if (!hasBaseline) return unityMatchesNow ? FigmaResult.InSync : marked ? FigmaResult.Adapted : FigmaResult.ToTriage;
+        if (!hasBaseline) return unityMatchesNow ? FigmaResult.InSync : marked ? FigmaResult.Adapted : FigmaResult.FollowFigma;
 
         bool figmaChanged = !Same(figmaNow, figmaBaseline);
         if (!figmaChanged)
@@ -382,6 +597,25 @@ public static class FigmaSync
         entry.unityStyle = best.name;
         entry.note = $"Suggested: matches {string.Join(", ", matched)}. Check it, then set confirmed to true.";
         return entry;
+    }
+
+    /// <summary>
+    /// The state style named like the component (G3/Name tag is State_G3_NameTag) that shares at least one of its
+    /// states, or null. Never confirmed: the note lists the shared states for the person who confirms it.
+    /// </summary>
+    public static FigmaMapEntry SuggestState(FigmaComponent component, IEnumerable<UIStateStyle> stateStyles)
+    {
+        string key = StateKey(component.name);
+        UIStateStyle style = stateStyles?.FirstOrDefault(s => s != null && StateKey(s.name.StartsWith("State_") ? s.name.Substring(6) : s.name) == key);
+        if (style == null) return null;
+        List<string> states = style.States.Where(s => s != null && !string.IsNullOrEmpty(s.name) && VariantForState(component, s.name) != null)
+                                          .Select(s => s.name).ToList();
+        if (states.Count == 0) return null;
+        return new FigmaMapEntry
+        {
+            figmaId = component.id, figmaName = component.name, unityStyle = style.name, kind = FigmaMapEntry.StateKind,
+            note = $"Suggested: the name matches, and both have the states {string.Join(", ", states)}. Check it, then set confirmed to true.",
+        };
     }
 
     private static bool HasUseCase(string styleName, UITheme theme) => DesignSystemDoc.ExpectedFigmaName(styleName, theme).Contains("(use case");

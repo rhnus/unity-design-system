@@ -16,7 +16,7 @@ public static class DesignSystemCommands
     public static readonly string[] Names =
     {
         "info", "write-doc", "audit", "prepare", "propose-for", "show-proposals",
-        "figma-compare", "figma-confirm", "figma-mark", "figma-unmark", "figma-accept",
+        "figma-compare", "figma-confirm", "figma-unmap", "figma-mark", "figma-unmark", "figma-accept",
         "starter-presets", "starter-create",
     };
 
@@ -35,6 +35,7 @@ public static class DesignSystemCommands
                 "show-proposals" => ShowProposals(args),
                 "figma-compare" => Compare(FigmaSync.Run()),
                 "figma-confirm" => Confirm(args),
+                "figma-unmap" => Unmap(args),
                 "figma-mark" => Mark(args),
                 "figma-unmark" => new { removed = FigmaSync.Unmark(Required(args, "style"), Required(args, "field")) },
                 "figma-accept" => Accept(),
@@ -118,28 +119,30 @@ public static class DesignSystemCommands
         rows = r.rows.Select(x => new
         {
             x.style, x.figmaComponent, x.field, x.figmaNow, x.figmaBaseline, x.unityNow, x.mappingConfirmed,
-            result = FigmaSync.Label(x.result),
+            result = FigmaSync.Label(x.result), rule = x.adaptation?.rule, x.markProblem,
         }),
-        unmapped = r.unmapped.Select(u => new { u.figmaName, suggested = u.unityStyle, u.note }),
+        unmapped = r.unmapped.Select(u => new { u.figmaName, suggested = u.unityStyle, u.kind, u.note }),
         removed = r.removed.Select(c => c.name),
+        stateGaps = r.stateGaps.Select(g => new { g.style, g.component, g.state, g.onlyIn }),
+        r.unmappedStateStyles,
     };
 
     private static object Confirm(JObject args)
     {
-        string figma = Required(args, "figma");
-        List<FigmaMapEntry> map = FigmaSync.Load<List<FigmaMapEntry>>(FigmaSync.MapPath) ?? new List<FigmaMapEntry>();
-        FigmaMapEntry entry = map.FirstOrDefault(m => m.figmaId == figma || m.figmaName == figma)
-                              ?? throw new ArgumentException($"No map entry for '{figma}'. Run figma-compare first.");
-        if ((string)args["style"] is string style && style.Length > 0) entry.unityStyle = style;
-        entry.confirmed = true;
-        entry.note = $"Confirmed by {(string)args["by"] ?? Environment.UserName} on {DateTime.Now:yyyy-MM-dd}.";
-        FigmaSync.Save(FigmaSync.MapPath, map);
+        FigmaSync.Confirm(Required(args, "figma"), (string)args["style"], (string)args["by"] ?? Environment.UserName);
+        return Compare(FigmaSync.Run());
+    }
+
+    private static object Unmap(JObject args)
+    {
+        FigmaSync.Unmap(Required(args, "figma"), (string)args["by"] ?? Environment.UserName);
         return Compare(FigmaSync.Run());
     }
 
     private static object Mark(JObject args)
     {
-        FigmaSync.MarkAdapted(Required(args, "style"), Required(args, "field"), Required(args, "reason"), (string)args["by"] ?? Environment.UserName);
+        FigmaSync.MarkAdapted(Required(args, "style"), Required(args, "field"), Required(args, "rule"), (string)args["reason"],
+                              (string)args["by"] ?? Environment.UserName);
         return Compare(FigmaSync.Run());
     }
 
