@@ -126,6 +126,21 @@ One look for every graded answer, set once in the **UI Theme ▸ Right / wrong**
 - Connected so far: `QuizOptionView` (PopupQuiz, ConversationQuiz, HorizontalOptionQuiz, LO3 meeting minutes), `OptionCardBase` (Gantt quiz, SiteWalk, task-event and conversation option cards), `CategorizeDragCard`, `WBSActivityDragItem`. Other scripts with their own right/wrong colours can be connected the same way: ask `AnswerFeedback.TryGet(correct, out AnswerLook look)` and use its colours when it returns true.
 - The theme is found on its own: it loads with the first styled control in a scene.
 
+## State styles
+
+For components whose look follows the game, not the pointer: a name tag that is *Locked*, *Selected*, *Correct*,
+*Steer* or *Resolved*, a drop slot that goes *Live*, a clause that is *Struck*. Create one with **Create ▸ Design
+System ▸ State Style**.
+
+- Name each state exactly as the Figma variant does (`State=Steer` → `Steer`). Case doesn't matter.
+- Each state picks theme tokens for **Fill**, **Border**, **Ink** (text) and **Accent** (the component's extra part:
+  a grip, a tape strip, a connector), and an **Opacity**.
+- The component keeps its own state machine and asks `style.Resolve("Steer", fallback)`. Any token left empty, and
+  any state the style doesn't list, keeps the component's own colour, so assigning a half-finished style changes
+  nothing it doesn't name.
+- One style serves every instance of the component; a token edit restyles every style that uses it.
+- **Write Design System Doc** lists each state style and its tokens under *Components ▸ State styles*.
+
 ## Layouts and Content Size Fitters
 
 The system never adds a Content Size Fitter and never changes one by itself. It warns about the three setups that break layouts. Each warning appears on the button's **StyledButton** Inspector and in the setup report, with a one-click, undoable fix:

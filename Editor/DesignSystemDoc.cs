@@ -45,7 +45,8 @@ public static class DesignSystemDoc
 
         Directory.CreateDirectory(Folder);
         string path = $"{Folder}/{FileName}";
-        File.WriteAllText(path, Generate(theme, styles, uses, DateTime.Now, report, adaptations, DesignSystemSettings.Find()?.DocumentTitle));
+        File.WriteAllText(path, Generate(theme, styles, uses, DateTime.Now, report, adaptations, DesignSystemSettings.Find()?.DocumentTitle,
+                                         DesignSystemAssets.FindAll<UIStateStyle>()));
         if (theme != null) File.WriteAllText($"{Folder}/tokens.json", DesignTokenJson.Export(theme));
         return path;
     }
@@ -60,7 +61,8 @@ public static class DesignSystemDoc
     }
 
     public static string Generate(UITheme theme, IEnumerable<UIComponentStyle> styles, IReadOnlyDictionary<UIComponentStyle, int> uses, DateTime when,
-                                  FigmaReport report = null, IList<FigmaAdaptation> adaptations = null, string title = null)
+                                  FigmaReport report = null, IList<FigmaAdaptation> adaptations = null, string title = null,
+                                  IEnumerable<UIStateStyle> stateStyles = null)
     {
         var md = new StringBuilder();
         md.AppendLine($"# {title ?? "Design System"}");
@@ -82,6 +84,7 @@ public static class DesignSystemDoc
         if (theme != null) AppendTheme(md, theme);
         else md.AppendLine("## Theme\n\nNo UI Theme asset was found in the project.\n");
         AppendComponents(md, theme, styles.Where(s => s != null).ToList(), uses, report);
+        AppendStateStyles(md, theme, stateStyles?.Where(s => s != null).ToList());
         if (report != null) AppendComparison(md, report, theme);
         AppendAdaptations(md, adaptations);
         AppendSinceBaseline(md, report);
@@ -303,6 +306,27 @@ public static class DesignSystemDoc
                     usedBy,
                     status));
             }
+            md.AppendLine();
+        }
+    }
+
+    private static void AppendStateStyles(StringBuilder md, UITheme theme, List<UIStateStyle> styles)
+    {
+        if (styles == null || styles.Count == 0) return;
+        md.AppendLine("### State styles");
+        md.AppendLine();
+        md.AppendLine("Components whose look follows game state (Selected, Correct, Steer…). Each row is a Figma variant's state; *own* keeps the component's colour.");
+        md.AppendLine();
+        foreach (UIStateStyle s in styles.OrderBy(s => s.name, StringComparer.Ordinal))
+        {
+            md.AppendLine($"#### `{s.name}`");
+            md.AppendLine();
+            md.AppendLine("| State | Fill | Border | Ink | Accent | Opacity |");
+            md.AppendLine("|---|---|---|---|---|---|");
+            UITheme source = s.Theme != null ? s.Theme : theme;
+            foreach (UIStateStyle.State state in s.States.Where(st => st != null))
+                md.AppendLine(Row(state.name, Colour(state.fill, source), Colour(state.border, source), Colour(state.ink, source),
+                                  Colour(state.accent, source), $"{Mathf.RoundToInt(state.opacity * 100f)}%"));
             md.AppendLine();
         }
     }

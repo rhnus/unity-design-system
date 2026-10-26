@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **State styles** (`UIStateStyle`, Create ▸ Design System ▸ State Style) for components whose look follows game
+  state rather than pointer input: a name tag that is Locked, Selected, Correct, Steer or Resolved. Each state, named
+  as in the Figma variant, gives a fill, border, ink and accent token and an opacity; the component keeps its own
+  state machine and calls `Resolve(state, fallback)`. Anything the style leaves empty keeps the component's colour.
+- The generated design system doc lists every state style under **Components ▸ State styles**.
+
 ## 0.2.0 — 2026-10-23
 
 - **Starter kit for new projects.** **Tools ▸ Design System ▸ Set Up New Project…** builds a project's own theme, type
