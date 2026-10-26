@@ -7,9 +7,19 @@
   as in the Figma variant, gives a fill, border, ink and accent token and an opacity; the component keeps its own
   state machine and calls `Resolve(state, fallback)`. Anything the style leaves empty keeps the component's colour.
 - The generated design system doc lists every state style under **Components ▸ State styles**.
-- Agent command `figma-unmap` marks a Figma component as not used in the game, so it is neither compared nor
-  suggested again; `figma-confirm` adds the sync's suggestion when the map doesn't have it yet. `FigmaSync.Preview`
-  compares the files without writing anything.
+- **Figma Review window** (**Tools ▸ Design System ▸ Figma ▸ Review…**): every mapped component with Figma and Unity
+  side by side as swatches, a state drawn at reduced opacity also shown as drawn, each row's result, and the
+  decisions a developer makes: confirm a suggested mapping, mark a component as not used in the game, keep a value
+  under an agreed platform rule (only rules that would count are offered), or open Style Proposals to follow Figma.
+  Opening it writes nothing (`FigmaSync.Preview`); a decision writes only `component-map.json` or `adaptations.json`
+  and regenerates the doc. New agent command `figma-unmap` marks a component as not used, so it is neither compared
+  nor suggested again.
+- **Pictures in Figma Review.** Each panel shows the Figma picture of every compared variant (saved by
+  `Tools/figma_sync.py` under `figma/images/`, named by variant id: `FigmaSync.ImagePath`), and a **Used in the game**
+  list: each prefab control or scene object that references the style (`StyleUses`, found by GUID; prefabs read
+  through SerializedObject, scenes read as text and never opened), with **Ping**, **Open prefab** (selects the
+  control) and **Capture controls**, which renders up to six of them as saved in the prefab, through the same capture
+  Style Proposals uses. Nothing is written.
 - **The Figma sync compares state styles.** A `component-map.json` entry with `"kind": "state"` maps a Figma
   component set to a `UIStateStyle`: each state is matched to the variant with the same `State` (case and spaces
   ignored) and compared on fill, border (Figma stroke) and ink (label colour) as fields such as `Selected.fill`, under
