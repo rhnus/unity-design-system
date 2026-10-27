@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Sharp rounded corners.** `CornerSharpness.Upscale(image)` measures how far a sliced Image's corner art is drawn
+  beyond its source pixels (above 1 is blurry; ½ or less stays crisp on a 2× screen), and `MultiplierFor` gives the
+  multiplier that draws a radius from a sprite's corner. The README's **Sharp rounded corners** section states the
+  rule: fix a blurry corner with larger corner art at the same radius, never with a lower multiplier.
+- **Rounded Square retired.** Every use moves to Semi Rounded at a multiplier of 2. The theme's Shape/Rounded Square
+  token stays for old references and is not for new styles.
 - **State styles** (`UIStateStyle`, Create ▸ Design System ▸ State Style) for components whose look follows game
   state rather than pointer input: a name tag that is Locked, Selected, Correct, Steer or Resolved. Each state, named
   as in the Figma variant, gives a fill, border, ink and accent token and an opacity; the component keeps its own

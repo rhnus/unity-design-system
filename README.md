@@ -117,6 +117,21 @@ The Inspector shows the everyday fields first: **Shape**, **Fill Mode**, **Fill*
   - text over the line limit is a warning for the content's author.
 - **Height / Width / Min Width** work inside layout groups and Content Size Fitters. Sizes go through a Layout Element, which is added where a layout needs one. Stretched axes and grid cells are left alone.
 
+## Sharp rounded corners
+
+A sliced corner is drawn at *border ÷ (pixels per unit × Pixels Per Unit Multiplier)* canvas pixels. When that is larger than the corner art in the sprite, the corner is upscaled and looks blurry or stepped, and it gets worse on a 2× screen or when the panel is scaled up (an enlarged phone, a hover lift).
+
+- **The rule:** a corner never draws larger than its source art. `CornerSharpness.Upscale(image)` gives canvas pixels per source pixel: above 1 is blurry everywhere; ½ or less stays crisp on a 2× screen and when scaled.
+- **Rounded Square is retired. Use Semi Rounded at a Pixels Per Unit Multiplier of 2** — a 13px corner, crisp on a 2× screen — wherever a panel, card or button used it. Rounded Square's 68px art is too small for the panels it was stretched over. The theme keeps its Shape/Rounded Square token only so old references still resolve; don't pick it for a new style.
+- **Aim for a multiplier that draws the art at half size or less** — typically 2 to 3 for a 100 PPU shape. A corner drawn 1:1 is the edge of acceptable and already looks soft on most screens.
+- **Fix it with the sprite, not by lowering the multiplier.** A lower multiplier gives a bigger corner from the same few pixels, which is what makes it blurry. A higher one sharpens it but also shrinks the radius. To keep the radius, use a sprite with larger corner art and the multiplier that draws the same radius from it (`CornerSharpness.MultiplierFor`):
+  - up to a 13px radius: **Semi Rounded** at a multiplier of 2 or more;
+  - larger radii and pills: **Circle - 256**.
+- **Convert by the curve, not the slice border.** The visible corner is the curve the art draws, which is often narrower than its border: Semi Rounded draws a 26px curve in a 30px border, Rounded Square 20px in 32px, Circle - 256 the full 128px. Converting by the border rounds the corner further than it was.
+- **A new sprite can resize the box.** A sliced Image reports a min and preferred size from its sprite's borders and pixel size. Where a parent layout group controls the Image's size, or a Content Size Fitter sits on it, swapping the sprite changes those numbers and the box grows or shrinks (a bubble gains empty padding, a button panel runs off screen). Measure `LayoutUtility` before and after, and leave such an Image alone or give it a Layout Element that fixes its size first.
+- **Unity's built-in UISprite and Background draw a 7.5px curve** (inside a 10px border, 1.5px in from the edge) at 200 pixels per unit, so any multiplier below 1 upscales them. Don't use them for rounded panels.
+- A style with **Corner Radius** set works out the multiplier for you. Pick a **Shape** whose corner art is at least twice that radius.
+
 ## Right / wrong
 
 One look for every graded answer, set once in the **UI Theme ▸ Right / wrong** section: a fill, a border and a mark (tick / cross) for each verdict. Tick **Use for every graded answer** to switch it on; until then every component keeps its own colours.
