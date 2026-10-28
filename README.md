@@ -239,17 +239,26 @@ Driving it from scripts and AI agents: `DesignSystemCommands.Run(command, json)`
 `figma-unmark`, `figma-accept`, `starter-presets`, `starter-create`) and JSON arguments, and returns JSON. Code that can't reference the package assemblies,
 such as Unity's AI command runner, calls it by name: `Type.GetType("DesignSystemCommands, DesignSystem.Editor")`.
 
-## Releasing
+## Releasing and contributing
 
-The package is developed embedded in ADGBL (`ADGBL/Packages/com.nus.design-system`) and published to
-<https://github.com/rhnus/unity-design-system>, whose history is this folder's. To release:
+The package lives in two places that stay in step: <https://github.com/rhnus/unity-design-system>, where anyone
+sends pull requests and releases are tagged, and ADGBL (`ADGBL/Packages/com.nus.design-system`), which embeds it
+and edits it in place. `Tools~/publish.py` keeps them in step; it works the same in ADGBL and in a clone of the
+GitHub repository:
 
-1. Bump `version` in `package.json` **and** `Skills~/.claude-plugin/plugin.json`, and date the CHANGELOG entry.
-2. Commit in ADGBL, then from the ADGBL repository root (the folder above `ADGBL/`):
-   ```
-   git subtree push --prefix=ADGBL/Packages/com.nus.design-system https://github.com/rhnus/unity-design-system.git main
-   ```
-3. Tag the published commit `vX.Y.Z` in the Design System repository and push the tag.
+```
+python Tools~/publish.py status            # who has changes the other doesn't
+python Tools~/publish.py pull              # bring GitHub's merged pull requests in
+python Tools~/publish.py push              # publish committed changes to GitHub's main
+python Tools~/publish.py release 0.3.1     # pull, bump both versions, date the CHANGELOG, commit, push, tag
+```
 
-Never commit to the Design System repository directly: a commit made there, and not in ADGBL, makes the next
-`subtree push` fail. Every file in the package needs a `.meta`, because a package installed from git is read-only.
+- **Pull before you push.** `push` refuses while GitHub has commits this copy doesn't; `pull`, then push again.
+- **In ADGBL it touches nothing else**: uncommitted or staged work outside the package stays as it is, and only the
+  package's own files are committed. Each publish records where it got to, so it takes seconds, not minutes.
+- **A conflict** (both sides changed the same lines) is reported with nothing changed. Make the files match one
+  side, commit, and pull again.
+- **Before a release**, describe the change under `## Unreleased` in the CHANGELOG; `release` refuses without it.
+
+How to send a change, and the urgent-fix route, are in [CONTRIBUTING.md](CONTRIBUTING.md). Every file in the
+package needs a `.meta`, because a package installed from git is read-only.

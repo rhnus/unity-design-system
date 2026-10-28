@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **`Tools~/publish.py`** keeps GitHub and an embedding project (ADGBL) in step: `status`, `pull`, `push` and
+  `release <version>`. In an embedding project it needs no clean working tree, commits only the package's files, and
+  records each publish so the next takes seconds. **CONTRIBUTING.md** says how to send a change and ship an urgent fix.
+
 ## 0.3.0 — 2026-10-28
 
 - **Published on its own** at <https://github.com/rhnus/unity-design-system>; install by git URL and tag (`#v0.3.0`).
