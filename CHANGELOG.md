@@ -6,6 +6,10 @@
   beyond its source pixels (above 1 is blurry; ½ or less stays crisp on a 2× screen), and `MultiplierFor` gives the
   multiplier that draws a radius from a sprite's corner. The README's **Sharp rounded corners** section states the
   rule: fix a blurry corner with larger corner art at the same radius, never with a lower multiplier.
+- **Disabled look for buttons.** A button style's **Disabled look** gives a button that can't be used its own fill
+  and label colour in play, in place of the Disabled Tint, which can only darken. `UIButtonStyle.UsesDisabledLook`,
+  `DisabledFill`, `DisabledLabelColor`; `StyledButton.ShowsDisabledLook`. `UIComponentStyle.StateColors` is now
+  virtual. The README's **Disabled buttons** section states the rule: primary buttons go light grey.
 - **Rounded Square retired.** Every use moves to Semi Rounded at a multiplier of 2. The theme's Shape/Rounded Square
   token stays for old references and is not for new styles.
 - **State styles** (`UIStateStyle`, Create ▸ Design System ▸ State Style) for components whose look follows game

@@ -132,6 +132,15 @@ A sliced corner is drawn at *border ÷ (pixels per unit × Pixels Per Unit Multi
 - **Unity's built-in UISprite and Background draw a 7.5px curve** (inside a 10px border, 1.5px in from the edge) at 200 pixels per unit, so any multiplier below 1 upscales them. Don't use them for rounded panels.
 - A style with **Corner Radius** set works out the multiplier for you. Pick a **Shape** whose corner art is at least twice that radius.
 
+## Disabled buttons
+
+- **The rule:** a primary button that can't be used yet is light grey, as in the Figma G3/Action button's Disabled state: fill **State/Disabled/Fill** (#E6E6E6) and label **State/Disabled/Ink** (#A3A3A3). It never shows as a faded or darker orange. Every `Button_Primary` style has this switched on.
+- **Disabled look** (on a button style) turns it on. In play, a button whose Button, or a Canvas Group above it, is not interactable swaps to the disabled fill and label colour, and swaps back when it can be used again. The Disabled Tint is not multiplied over it.
+- **Why a look and not a tint:** the Disabled Tint multiplies the button's own colour, so it can only darken. Orange times any tint is a muddy orange or brown, never grey.
+- **Gate with `interactable`.** Hiding a gated button with SetActive throws away what the player is working towards.
+- A recoloured shape keeps its shading, so the orange border becomes a slightly darker grey, close to Figma's #D0D0D0.
+- **In the editor** a button saved non-interactable still shows its live colours, so prefabs are never saved grey.
+
 ## Right / wrong
 
 One look for every graded answer, set once in the **UI Theme ▸ Right / wrong** section: a fill, a border and a mark (tick / cross) for each verdict. Tick **Use for every graded answer** to switch it on; until then every component keeps its own colours.

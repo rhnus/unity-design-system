@@ -200,7 +200,7 @@ public abstract class UIComponentStyle : ScriptableObject
     public float MinWidth { get => minWidth; set => minWidth = value; }
     public bool ControlsSize => Height > 0f || Width > 0f || minWidth > 0f;
 
-    public ColorBlock StateColors => new ColorBlock
+    public virtual ColorBlock StateColors => new ColorBlock
     {
         normalColor = Color.white,
         highlightedColor = highlightedTint,
