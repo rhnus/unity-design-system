@@ -5,6 +5,8 @@
 - **`Tools~/publish.py`** keeps GitHub and an embedding project (ADGBL) in step: `status`, `pull`, `push` and
   `release <version>`. In an embedding project it needs no clean working tree, commits only the package's files, and
   records each publish so the next takes seconds. **CONTRIBUTING.md** says how to send a change and ship an urgent fix.
+- **Ready to move accounts:** the repository's address is `package.json`'s `repository` field, which `publish.py`
+  reads. **MIGRATION.md** is the step-by-step move to another GitHub account without breaking any project.
 
 ## 0.3.0 — 2026-10-28
 

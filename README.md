@@ -260,5 +260,6 @@ python Tools~/publish.py release 0.3.1     # pull, bump both versions, date the 
   side, commit, and pull again.
 - **Before a release**, describe the change under `## Unreleased` in the CHANGELOG; `release` refuses without it.
 
-How to send a change, and the urgent-fix route, are in [CONTRIBUTING.md](CONTRIBUTING.md). Every file in the
+How to send a change, and the urgent-fix route, are in [CONTRIBUTING.md](CONTRIBUTING.md); moving the repository to
+another GitHub account without breaking any project is in [MIGRATION.md](MIGRATION.md). Every file in the
 package needs a `.meta`, because a package installed from git is read-only.
