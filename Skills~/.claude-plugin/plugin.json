@@ -1,0 +1,6 @@
+{
+  "name": "nus-design-system",
+  "version": "0.3.0",
+  "description": "Claude Code skills for the com.nus.design-system Unity package: review controls against the Design System, sync the Figma file, and give gated buttons the Design System's disabled look.",
+  "author": { "name": "NUS ADGBL team" }
+}

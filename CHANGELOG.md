@@ -1,11 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-28
 
+- **Published on its own** at <https://github.com/rhnus/unity-design-system>; install by git URL and tag (`#v0.3.0`).
+  ADGBL keeps it embedded and publishes from there. MIT licence.
 - **Sharp rounded corners.** `CornerSharpness.Upscale(image)` measures how far a sliced Image's corner art is drawn
   beyond its source pixels (above 1 is blurry; ½ or less stays crisp on a 2× screen), and `MultiplierFor` gives the
   multiplier that draws a radius from a sprite's corner. The README's **Sharp rounded corners** section states the
   rule: fix a blurry corner with larger corner art at the same radius, never with a lower multiplier.
+- **Claude Code skills ship with the package** in `Skills~/`, as a plugin (`nus-design-system`): `style-review`,
+  `figma-sync` (with its fetcher, `scripts/figma_sync.py`, and the pipeline rules) and `button-disabled-state`. The
+  package's own `.claude-plugin/marketplace.json` lists it.
 - **Disabled look for buttons.** A button style's **Disabled look** gives a button that can't be used its own fill
   and label colour in play, in place of the Disabled Tint, which can only darken. `UIButtonStyle.UsesDisabledLook`,
   `DisabledFill`, `DisabledLabelColor`; `StyledButton.ShowsDisabledLook`. `UIComponentStyle.StateColors` is now

@@ -1,0 +1,13 @@
+{
+  "name": "unity-design-system",
+  "owner": {
+    "name": "NUS ADGBL team"
+  },
+  "plugins": [
+    {
+      "name": "nus-design-system",
+      "source": "./Skills~",
+      "description": "Skills for the com.nus.design-system Unity package: style review, Figma sync, disabled buttons."
+    }
+  ]
+}

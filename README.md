@@ -196,15 +196,18 @@ TypographyScale (text roles)        → StyledText    on a TMP text
 
 ## Reusing in another project
 
-This folder is a Unity package, `com.nus.design-system`. Add it to another project in **Package Manager ▸ + ▸ Add package from git URL…** with the repository's git URL plus the package folder and a release tag:
+This folder is a Unity package, `com.nus.design-system`, published at <https://github.com/rhnus/unity-design-system>. Add it to another project in **Package Manager ▸ + ▸ Add package from git URL…** with a release tag:
 
 ```
-<repository git URL>?path=/ADGBL/Packages/com.nus.design-system#design-system-v0.2.0
+https://github.com/rhnus/unity-design-system.git#v0.3.0
 ```
 
 Or copy the folder into the project's `Packages/` folder to edit it there. It is two asmdefs, `DesignSystem` and `DesignSystem.Editor`, that depend only on uGUI (with TextMeshPro) and, in the editor, Newtonsoft JSON; Package Manager installs both. The package's code is read-only in a project that installs it by git URL; the project's design system lives in its own assets.
 
 Requirements: Unity 6 (built on 6000.3).
+
+**Claude Code skills** for the package (style review, Figma sync, disabled buttons) ship in `Skills~/`, which Unity
+ignores. It is a Claude Code plugin; [Skills~/README.md](Skills~/README.md) says how to install it in a project.
 
 Then pick the start that fits:
 
@@ -235,3 +238,18 @@ Driving it from scripts and AI agents: `DesignSystemCommands.Run(command, json)`
 `write-doc`, `audit`, `prepare`, `propose-for`, `show-proposals`, `figma-compare`, `figma-confirm`, `figma-mark`,
 `figma-unmark`, `figma-accept`, `starter-presets`, `starter-create`) and JSON arguments, and returns JSON. Code that can't reference the package assemblies,
 such as Unity's AI command runner, calls it by name: `Type.GetType("DesignSystemCommands, DesignSystem.Editor")`.
+
+## Releasing
+
+The package is developed embedded in ADGBL (`ADGBL/Packages/com.nus.design-system`) and published to
+<https://github.com/rhnus/unity-design-system>, whose history is this folder's. To release:
+
+1. Bump `version` in `package.json` **and** `Skills~/.claude-plugin/plugin.json`, and date the CHANGELOG entry.
+2. Commit in ADGBL, then from the ADGBL repository root (the folder above `ADGBL/`):
+   ```
+   git subtree push --prefix=ADGBL/Packages/com.nus.design-system https://github.com/rhnus/unity-design-system.git main
+   ```
+3. Tag the published commit `vX.Y.Z` in the Design System repository and push the tag.
+
+Never commit to the Design System repository directly: a commit made there, and not in ADGBL, makes the next
+`subtree push` fail. Every file in the package needs a `.meta`, because a package installed from git is read-only.
